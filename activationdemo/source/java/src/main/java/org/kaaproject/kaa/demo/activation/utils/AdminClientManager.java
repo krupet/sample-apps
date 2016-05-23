@@ -16,16 +16,16 @@
 
 package org.kaaproject.kaa.demo.activation.utils;
 
-import org.kaaproject.kaa.common.dto.*;
+import org.kaaproject.kaa.common.dto.ApplicationDto;
+import org.kaaproject.kaa.common.dto.EndpointGroupDto;
+import org.kaaproject.kaa.common.dto.EndpointProfileDto;
+import org.kaaproject.kaa.common.dto.EndpointProfilesPageDto;
+import org.kaaproject.kaa.common.dto.PageLinkDto;
 import org.kaaproject.kaa.common.dto.admin.AuthResultDto;
-import org.kaaproject.kaa.common.dto.credentials.CredentialsDto;
-import org.kaaproject.kaa.common.endpoint.security.KeyUtil;
-import org.kaaproject.kaa.demo.activation.model.DeviceState;
 import org.kaaproject.kaa.server.common.admin.AdminClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.security.KeyPair;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,20 +36,14 @@ public class AdminClientManager {
 
     private static final String TENANT_DEV_USERNAME = "devuser";
     private static final String TENANT_DEV_PASSWORD = "devuser123";
-
-    private static final String TENANT_ADMIN_USERNAME = "admin";
-    private static final String TENANT_ADMIN_PASSWORD = "admin123";
-
     private static final String DEFAULT_LIMIT = "20";
     private static final String DEFAULT_OFFSET = "0";
     private static final int KAA_PORT = 8080;
 
     private AdminClient adminClient;
     private static AdminClientManager instance;
-    private UserType userType;
 
-    private AdminClientManager(String host, int port, UserType userType) {
-        this.userType = userType;
+    private AdminClientManager(String host, int port) {
         adminClient = new AdminClient(host, port);
     }
 
@@ -58,15 +52,7 @@ public class AdminClientManager {
     }
 
     public static void init(String host, int port) {
-        instance = new AdminClientManager(host, port, UserType.TENANT_DEVELOPER);
-    }
-
-    public static void init(String host, UserType userType){
-        init(host, KAA_PORT, userType);
-    }
-
-    public static void init(String host, int port, UserType userType){
-        instance = new AdminClientManager(host, port, userType);
+        instance = new AdminClientManager(host, port);
     }
 
     public static AdminClientManager instance() {
@@ -74,30 +60,6 @@ public class AdminClientManager {
             LOG.error("Admin client was not initialized");
         }
         return instance;
-    }
-
-    /**
-     * Generate public and private key pair
-     *
-     * @return Generated KeyPair
-     */
-    public KeyPair generateKeyPair(){
-        return KeyUtil.generateKeyPair("./key.private", "./key.public");
-    }
-
-    public void provideCredentials(String applicationName, byte[] publicKey){
-        CredentialsDto credentialsDto = adminClient.provisionCredentials(getApplicationByName(applicationName).getApplicationToken(),
-                publicKey);
-        adminClient.provisionRegistration(getApplicationByName(applicationName).getApplicationToken(), credentialsDto
-                .getId(), 1, DeviceState.toJsonString(true));
-        LOG.debug("APP TOKEN: {}", getApplicationByName(applicationName).getApplicationToken());
-        LOG.info("Credentials with ID={} are now in status: {}", credentialsDto.getId(), credentialsDto.getStatus());
-    }
-
-    public void revokeCredentials(String applicationName, String credentialsId){
-        LOG.debug("APP TOKEN: {}", getApplicationByName(applicationName).getApplicationToken());
-        adminClient.revokeCredentials(getApplicationByName(applicationName).getApplicationToken(), credentialsId);
-        LOG.info("Credentials revoked.");
     }
 
     /**
@@ -120,11 +82,7 @@ public class AdminClientManager {
      */
     public void checkAuthorizationAndLogin() {
         if (!checkAuth()) {
-            if(UserType.TENANT_ADMIN.equals(userType)){
-                adminClient.login(TENANT_ADMIN_USERNAME, TENANT_ADMIN_PASSWORD);
-            }else {
-                adminClient.login(TENANT_DEV_USERNAME, TENANT_DEV_PASSWORD);
-            }
+            adminClient.login(TENANT_DEV_USERNAME, TENANT_DEV_PASSWORD);
         }
     }
 
@@ -176,7 +134,7 @@ public class AdminClientManager {
 
     /**
      * Get all endpoint groups associated with given application Token
-     * 
+     *
      * @param applicationToken
      *            the application Token
      * @return list of endpoint groups
@@ -251,10 +209,4 @@ public class AdminClientManager {
 
         return endpointProfiles;
     }
-
-    public enum UserType {
-        TENANT_ADMIN,
-        TENANT_DEVELOPER
-    }
-
 }
